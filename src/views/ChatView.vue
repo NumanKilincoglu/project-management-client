@@ -89,16 +89,16 @@
                 class="message_box"
               >
                 <div>
-                  <span>{{ message.senderName }}</span>
+                  <span>{{ message.sender }}</span>
                 </div>
                 <p>
                   {{ message.content }}
                 </p>
-                <div v-if="message.file">
+                <div v-if="message && message.file && message.file.fileData">
                   <a :href="message.file.fileData" target="_blank">{{
                     message.file.fileName
                   }}</a>
-                  <img :src="message.file.fileData" alt="Resim" />
+                  <img :src="message.file.fileData" alt="Resim" style="height: 120px; width: 120px;" />
                   <button @click="downloadFile(message.file.fileData)">
                     İndir
                   </button>
@@ -186,7 +186,8 @@
 
 <script>
 import { socket } from "@/socket";
-
+import { Buffer } from "buffer";
+window.Buffer = window.Buffer || Buffer;
 export default {
   name: "HomeView",
   components: {},
@@ -224,12 +225,16 @@ export default {
       this.messages = [];
       const token = localStorage.getItem("token");
       socket.emit("project_users", { projectID: project.id, token });
-      socket.emit("leave_room", { roomID:this.selectedProjectID, token });
+      const previousRoomID = this.selectedProjectID;
 
       this.selectedProjectID = project.id;
       this.selectedProject = project;
 
-      socket.emit("join_room", { roomID: project.id, token });
+      socket.emit("join_room", {
+        previousRoomID: previousRoomID,
+        roomID: project.id,
+        token,
+      });
     },
 
     async getProjects() {
@@ -238,14 +243,15 @@ export default {
       });
     },
     async sendMsg() {
-      // const token = localStorage.getItem("token");
       const projectID = this.selectedProjectID;
       const message = this.message;
+      const token = localStorage.getItem("token");
 
       socket.emit("send_message", {
         roomID: projectID,
         message,
         fileData: null,
+        token,
       });
     },
     async changeToDM(user) {
@@ -293,7 +299,7 @@ export default {
       const file = event.target.files[0];
       if (file) {
         this.selectedFile = file;
-
+        const token = localStorage.getItem("token");
         const reader = new FileReader();
         const projectID = this.selectedProjectID;
         const message = this.message;
@@ -305,7 +311,12 @@ export default {
             fileType: file.type,
             fileData: fileData,
           };
-          socket.emit("send_message", { roomID: projectID, message, fileData });
+          socket.emit("send_message", {
+            roomID: projectID,
+            message,
+            fileData,
+            token,
+          });
         };
 
         // Dosya okuma işlemi başlat
@@ -335,23 +346,47 @@ export default {
 
     socket.on("receive_message", (data) => {
       const { sender, content, file } = data;
-        console.log(data);
+
       if (!file) {
         this.messages.push({
-          sender: sender,
+          sender: sender.username,
           content: content,
         });
         return;
       }
 
-      if (file.fileType == "image/jpeg") {
-
+      if (file) {
         this.messages.push({
           sender: sender,
           content: null,
           file: file,
         });
       }
+    });
+
+    socket.on("previous_messages", (data) => {
+      const { messages } = data;
+
+      if (!messages || messages.length === 0) return;
+
+      messages.forEach((e) => {
+        let fileData = {
+          name: "file",
+          type: "",
+          fileData: e.file,
+        };
+
+        if (e.file) {
+          fileData.fileData = e.file;
+        }
+
+        this.messages.push({
+          sender: e.user.username,
+          content: e.message,
+          file: fileData,
+        });
+        
+      });
     });
   },
   created() {
@@ -562,6 +597,7 @@ p {
   padding: 1em;
   display: flex;
   gap: 50px;
+  overflow: scroll;
 }
 
 .project input {

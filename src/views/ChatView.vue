@@ -95,18 +95,16 @@
                   {{ message.content }}
                 </p>
                 <div v-if="message && message.file && message.file.fileData">
-                  <a :href="message.file.fileData" target="_blank">{{
-                    message.file.fileName
-                  }}</a>
-                  <img :src="message.file.fileData" alt="Resim" style="height: 120px; width: 120px;" />
-                  <button @click="downloadFile(message.file.fileData)">
-                    İndir
-                  </button>
+                  <img
+                    :src="message.file.fileData"
+                    alt="Resim"
+                    style="height: 120px; width: 120px"
+                  />
                 </div>
                 <div
                   style="display: flex; justify-content: flex-end; width: 100%"
                 >
-                  <span>{{ new Date().toLocaleDateString() }}</span>
+                  <span>{{ message.created_at }}</span>
                 </div>
               </div>
             </div>
@@ -147,16 +145,23 @@
               >
                 <div>
                   <span style="color: rgb(228, 44, 44)">{{
-                    message.senderName
+                    message.sender
                   }}</span>
                 </div>
                 <p>
                   {{ message.content }}
                 </p>
+                <div v-if="message && message.file && message.file.fileData">
+                  <img
+                    :src="message.file.fileData"
+                    alt="Resim"
+                    style="height: 120px; width: 120px"
+                  />
+                </div>
                 <div
                   style="display: flex; justify-content: flex-end; width: 100%"
                 >
-                  <span>{{ new Date().toLocaleDateString() }}</span>
+                  <span>{{ message.created_at }}</span>
                 </div>
               </div>
             </div>
@@ -170,11 +175,12 @@
                 @keyup.enter="sendMessage"
               />
               <button @click="sendDMMsg()">Send</button>
+              <button @click="selectFile">Select File</button>
               <input
                 type="file"
                 ref="fileInput"
                 style="display: none"
-                @change="handleFileSelect"
+                @change="handleFileSelectPrivate"
               />
             </div>
           </div>
@@ -186,8 +192,7 @@
 
 <script>
 import { socket } from "@/socket";
-import { Buffer } from "buffer";
-window.Buffer = window.Buffer || Buffer;
+
 export default {
   name: "HomeView",
   components: {},
@@ -236,7 +241,6 @@ export default {
         token,
       });
     },
-
     async getProjects() {
       socket.on("my_projects", (data) => {
         this.projects = data;
@@ -256,14 +260,19 @@ export default {
     },
     async changeToDM(user) {
       const userId = localStorage.getItem("userID");
+      const token = localStorage.getItem("token");
       if (user.id == userId)
         return alert("You cannot send message to yourself");
       this.isGroupChat = false;
       this.selectedUser = user;
+
+      socket.emit("load_private_message", {
+        recipientID: user.id,
+        token,
+      });
     },
     async sendDMMsg() {
       const token = localStorage.getItem("token");
-      const userID = localStorage.getItem("userID");
       const senderName = localStorage.getItem("userName");
       const receiverID = this.selectedUser.id;
       const message = this.message;
@@ -274,11 +283,12 @@ export default {
         message,
         token,
       });
-
+      let fileData = null;
       this.privateMessages.push({
-        sender: userID, // Gönderen istemcinin kimliği
-        senderName: senderName,
+        sender: senderName,
         content: message,
+        file: fileData,
+        created_at: new Date().toLocaleDateString(),
       });
     },
     copyToken(token) {
@@ -311,6 +321,7 @@ export default {
             fileType: file.type,
             fileData: fileData,
           };
+
           socket.emit("send_message", {
             roomID: projectID,
             message,
@@ -319,12 +330,61 @@ export default {
           });
         };
 
-        // Dosya okuma işlemi başlat
+        reader.readAsDataURL(file);
+      }
+    },
+    handleFileSelectPrivate(event) {
+      const file = event.target.files[0];
+      const senderName = localStorage.getItem("userName");
+      const receiverID = this.selectedUser.id;
+      const message = this.message;
+
+      if (file) {
+        this.selectedFile = file;
+        const token = localStorage.getItem("token");
+        const reader = new FileReader();
+
+        reader.onload = (event) => {
+          let fileData = event.target.result;
+
+          socket.emit("send_private_message", {
+            recipientID: receiverID,
+            senderName: this.userName,
+            message,
+            token,
+            fileData: fileData,
+          });
+
+          let fileDataAdd = {
+            name: "file",
+            type: "",
+            fileData: fileData,
+          };
+
+          this.privateMessages.push({
+            sender: senderName,
+            content: message,
+            file: fileDataAdd,
+            created_at: new Date().toLocaleDateString(),
+          });
+        };
+
         reader.readAsDataURL(file);
       }
     },
     downloadFile(url) {
       window.open(url, "_blank");
+    },
+    formatDateTime(isoString) {
+      const dateObj = new Date(isoString);
+
+      const day = dateObj.getDate().toString().padStart(2, "0");
+      const month = (dateObj.getMonth() + 1).toString().padStart(2, "0");
+      const year = dateObj.getFullYear();
+      const hours = dateObj.getHours().toString().padStart(2, "0");
+      const minutes = dateObj.getMinutes().toString().padStart(2, "0");
+
+      return `${day}/${month}/${year} ${hours}.${minutes}`;
     },
   },
   mounted() {
@@ -340,8 +400,51 @@ export default {
       this.userList = data;
     });
 
+    socket.on("get_private_messages", (data) => {
+      const { messages } = data;
+
+      if (!messages || messages.length === 0) return;
+      this.privateMessages = [];
+      messages.forEach((e) => {
+        let fileData = {
+          name: "file",
+          type: "",
+          fileData: e.file,
+          created_at: this.formatDateTime(e.created_at),
+        };
+
+        if (e.file) {
+          fileData.fileData = e.file;
+        }
+
+        this.privateMessages.push({
+          sender: e.sender.username,
+          content: e.message,
+          file: fileData,
+          created_at: this.formatDateTime(e.created_at),
+        });
+      });
+    });
+
     socket.on("private_message", (data) => {
-      this.privateMessages.push(data);
+      if (!data) return;
+      let fileData = {
+        name: "file",
+        type: "",
+        fileData: data.file,
+        created_at: this.formatDateTime(data.created_at),
+      };
+
+      if (data.file) {
+        fileData.fileData = data.file;
+      }
+
+      this.privateMessages.push({
+        sender: data.sender,
+        content: data.content,
+        file: fileData,
+        created_at: this.formatDateTime(data.created_at),
+      });
     });
 
     socket.on("receive_message", (data) => {
@@ -351,15 +454,17 @@ export default {
         this.messages.push({
           sender: sender.username,
           content: content,
+          created_at: new Date().toLocaleDateString(),
         });
         return;
       }
 
       if (file) {
         this.messages.push({
-          sender: sender,
+          sender: sender.username,
           content: null,
           file: file,
+          created_at: new Date().toLocaleDateString(),
         });
       }
     });
@@ -368,12 +473,13 @@ export default {
       const { messages } = data;
 
       if (!messages || messages.length === 0) return;
-
+      this.messages = [];
       messages.forEach((e) => {
         let fileData = {
           name: "file",
           type: "",
           fileData: e.file,
+          created_at: this.formatDateTime(e.created_at),
         };
 
         if (e.file) {
@@ -384,8 +490,8 @@ export default {
           sender: e.user.username,
           content: e.message,
           file: fileData,
+          created_at: this.formatDateTime(e.created_at),
         });
-        
       });
     });
   },

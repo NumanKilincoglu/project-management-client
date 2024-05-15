@@ -1,8 +1,7 @@
 import axios from 'axios'
 /* eslint-env node */
-let baseurl = process.env.mode == 'prod' ? '' : 'http://localhost:3000/';
+let baseurl = 'https://project-management-server-fvka.onrender.com/';
 
-//baseurl = 'https://api.mosecop.com/api/v1/';
 export const apiInstance = axios.create({
   baseURL: baseurl,
   headers: {

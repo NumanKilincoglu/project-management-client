@@ -17,7 +17,7 @@
           <p class="response" v-if="!loading">
             Proje Oluşturuldu:
             <span class="response" v-if="responseToken">{{
-              responseToken
+              createResponse
             }}</span>
           </p>
         </div>
@@ -29,9 +29,9 @@
           </div>
           <button class="btn" @click="join">Join</button>
           <p class="response" v-if="!joinLoading">
-            Projeye Katıldın:
+            You joined the project:
             <span class="response" v-if="responseToken">{{
-              responseToken
+              createResponse
             }}</span>
           </p>
         </div>
@@ -64,8 +64,8 @@
           </tbody>
         </table>
         <p class="response" v-if="!loading">
-          Proje Oluşturuldu:
-          <span class="response" v-if="responseToken">{{ responseToken }}</span>
+          Project has been created:
+          <span class="response" v-if="responseToken">{{ createResponse }}</span>
         </p>
       </div>
     </div>
@@ -76,7 +76,7 @@
 //import SocketService from "../service/socket-service.js";
 import { io } from "socket.io-client";
 
-const socket = io("http://localhost:3001");
+const socket = io("https://project-management-server-fvka.onrender.com");
 export default {
   name: "HomeView",
   components: {},
@@ -89,11 +89,12 @@ export default {
       responseToken: null,
       projects: [],
       joinToken: null,
+      createResponse: "Succesfull",
     };
   },
   methods: {
     goRoute(link) {
-      this.$router.push(link); 
+      this.$router.push(link);
     },
     async getProjects() {
       socket.on("my_projects", (data) => {
@@ -108,7 +109,6 @@ export default {
       const project = { name: this.name, content: this.content };
 
       socket.emit("create_project", { project, token });
-      console.log(project, token);
       socket.on("create_project", (response) => {
         this.responseToken = response;
       });
@@ -123,6 +123,12 @@ export default {
 
       socket.on("join_project", (response) => {
         this.responseToken = response;
+
+        if (response && response.success) {
+          this.createResponse = "Project creatd successfully.";
+        } else {
+          this.createResponse = "Failed.";
+        }
       });
       this.joinLoading = false;
     },
@@ -139,7 +145,7 @@ export default {
     },
   },
   mounted() {
-    const serverUrl = "http://localhost:3001";
+    const serverUrl = "https://project-management-server-fvka.onrender.com";
 
     this.socket = io(serverUrl);
 
@@ -157,7 +163,6 @@ export default {
     socket.emit("my_projects", { token });
     socket.on("my_projects", (data) => {
       this.projects = data;
-      console.log(data);
     });
   },
   created() {

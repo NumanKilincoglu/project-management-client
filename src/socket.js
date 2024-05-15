@@ -5,13 +5,14 @@ export const state = reactive({
   connected: false,
 });
 
-export const socket = io("http://localhost:3001");
+export const socket = io("https://project-management-server-fvka.onrender.com");
 
 socket.on("connect", () => {
   const token = localStorage.getItem("token");
   socket.emit("login", { token });
   state.connected = true;
 });
+
 
 socket.on("disconnect", () => {
   state.connected = false;

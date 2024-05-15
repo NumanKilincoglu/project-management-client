@@ -30,8 +30,6 @@ export default {
   methods: {
     async login() {
       try {
-
-
         const response = await apiInstance.post("auth/login", {
           username: this.username,
           password: this.password,
@@ -42,9 +40,9 @@ export default {
         const success = response.data.success;
 
         if (success) {
-          localStorage.setItem('token', response.data.token)
-          localStorage.setItem('userID', response.data.userID)
-          localStorage.setItem('userName', response.data.userName)
+          localStorage.setItem("token", response.data.token);
+          localStorage.setItem("userID", response.data.userID);
+          localStorage.setItem("userName", response.data.userName);
           this.$router.push("/home");
         }
 
@@ -66,25 +64,33 @@ export default {
 .login-container {
   max-width: 400px;
   margin: auto;
-  padding: 20px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+  padding: 30px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  background-color: #f9f9f9;
 }
-
+h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+}
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 label {
   display: block;
+  margin-bottom: 8px;
   font-weight: bold;
+  color: #333;
 }
 
 input {
   width: 100%;
-  padding: 8px;
+  padding: 12px;
   font-size: 16px;
-  border: 1px solid #ccc;
+  border: 1px solid #ddd;
   border-radius: 4px;
 }
 
@@ -92,13 +98,19 @@ button {
   background-color: #007bff;
   color: white;
   border: none;
-  padding: 10px 20px;
+  padding: 12px 20px;
   border-radius: 5px;
   cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
 }
 
+button:hover {
+  background-color: #0056b3;
+}
 .error-message {
-  color: red;
+  color: #dc3545;
   font-weight: bold;
+  margin-top: 10px;
 }
 </style>
